@@ -10,12 +10,14 @@ set -euo pipefail
 #   INSTALL_DIR=/opt/Wan2.2     ./install_wan22.sh
 #   PYTHON_BIN=python3.11        ./install_wan22.sh
 #   STRICT_GPU_CHECK=1           ./install_wan22.sh   # fail if NVIDIA/CUDA checks fail
+#   INSTALL_FLASH_ATTN=1         ./install_wan22.sh   # install flash_attn too
 
 REPO_URL="https://github.com/Wan-Video/Wan2.2.git"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/Wan2.2}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${INSTALL_DIR}/.venv"
 STRICT_GPU_CHECK="${STRICT_GPU_CHECK:-0}"
+INSTALL_FLASH_ATTN="${INSTALL_FLASH_ATTN:-0}"
 
 log() { echo "[WAN2.2-INSTALL] $*"; }
 err() { echo "[WAN2.2-INSTALL][ERROR] $*" >&2; }
@@ -129,8 +131,19 @@ setup_venv_and_install() {
     exit 1
   fi
 
-  log "Installing Python requirements (this may take a while)..."
-  pip install -r "$INSTALL_DIR/requirements.txt"
+  local filtered_requirements
+  filtered_requirements="$(mktemp)"
+
+  if [ "$INSTALL_FLASH_ATTN" = "1" ]; then
+    log "Installing all Python requirements (including flash_attn)..."
+    cp "$INSTALL_DIR/requirements.txt" "$filtered_requirements"
+  else
+    log "Installing Python requirements (skipping flash_attn by default)..."
+    grep -Ev '^[[:space:]]*flash_attn([[:space:]]|[<>=!~]|$)' "$INSTALL_DIR/requirements.txt" > "$filtered_requirements"
+  fi
+
+  pip install -r "$filtered_requirements"
+  rm -f "$filtered_requirements"
 
   deactivate
 }
